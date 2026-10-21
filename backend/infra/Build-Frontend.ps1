@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$FrontendPath = '../xiaohashu-vue3',
+    [string]$FrontendPath = '../frontend',
     [string]$ImageTag = 'xiaohashu/frontend:local',
     [switch]$SkipNpmBuild
 )

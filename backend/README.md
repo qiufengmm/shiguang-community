@@ -22,7 +22,7 @@
 
 Java 17 · Spring Boot 3.0 · Spring Cloud 2022 · Spring Cloud Alibaba · Nacos · Gateway · OpenFeign · MyBatis · MySQL · Redis · RocketMQ · Sa-Token · MinIO · Cassandra · Elasticsearch · XXL-JOB · Sentinel · Docker Compose
 
-前端为 Vue 3 + Vite + Tailwind CSS，代码位于同级目录 `xiaohashu-vue3`。
+前端为 Vue 3 + Vite + Tailwind CSS，代码位于本仓库的 [`../frontend`](../frontend/README.md)。统一构建与目录说明见[仓库首页](../README.md)。
 
 ## 模块与端口
 
@@ -46,7 +46,8 @@ Java 17 · Spring Boot 3.0 · Spring Cloud 2022 · Spring Cloud Alibaba · Nacos
 完整应用（前端 + 12 个业务服务 + 基础设施）由 `infra/compose.yaml` 与 `infra/compose.app.yaml` 编排，启动方式、数据库迁移顺序和验收步骤见 [`infra/README.md`](infra/README.md)。
 
 ```powershell
-Set-Location F:\code\xiaohashu\xiaohashu
+# 从仓库根目录执行
+Set-Location backend
 & .\infra\Start-Local.ps1 -SkipBuild
 ```
 

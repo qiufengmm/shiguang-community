@@ -15,7 +15,8 @@
 先启动 Docker Desktop 并等待 Docker 引擎就绪。在这台已经构建好镜像的电脑上，日常启动时在 PowerShell 中执行：
 
 ```powershell
-Set-Location F:\code\xiaohashu\xiaohashu
+# 从仓库根目录执行
+Set-Location backend
 & .\infra\Start-Local.ps1 -SkipBuild
 ```
 
@@ -65,7 +66,7 @@ Get-Content -Raw database/25.16-note-content-delete-fence.cql |
 & .\infra\Start-Local.ps1 -SkipBuild
 ```
 
-`Build-Images.ps1` 显式使用 `D:\java\jdk-17.0.18+8`，不要用 shell 默认的 Java 21 替代。原版前端位于后端仓库的 `../xiaohashu-vue3`，即 `F:\code\xiaohashu\xiaohashu-vue3`；本机已有 `node_modules`，构建脚本执行 `npm run build`，将产物打入 `xiaohashu/frontend:local`。前端通过同源 `/api` 请求，由 Nginx 去掉 `/api` 后转发到 `gateway:8000`，保留各服务的双层路径前缀。
+`Build-Images.ps1` 显式使用 `D:\java\jdk-17.0.18+8`，不要用 shell 默认的 Java 21 替代。单仓库中的前端位于后端目录的 `../frontend`；先在 `frontend/` 执行 `npm ci`，再从 `backend/` 运行构建脚本。脚本执行 `npm run build`，将产物打入 `xiaohashu/frontend:local`。前端通过同源 `/api` 请求，由 Nginx 去掉 `/api` 后转发到 `gateway:8000`，保留各服务的双层路径前缀。
 
 查看启动状态或日志时，始终带上两个 Compose 文件和本机环境文件：
 

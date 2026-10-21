@@ -26,7 +26,7 @@ npm run build   # 产出 dist/
 
 开发代理默认连接本机 Gateway（`http://127.0.0.1:8000`）。网关位于其他地址时，将 `.env.example` 复制为 `.env.local` 并修改 `VITE_API_PROXY_TARGET`，然后重启开发服务。`.env.local` 不纳入 Git；不要在 `VITE_*` 变量中放置密钥。
 
-构建产物由后端仓库的 `infra/frontend/Dockerfile` 打包进 Nginx 镜像，容器端口 80，映射到宿主机 8088。完整应用启动方式见后端仓库 `infra/README.md`。
+构建产物由 [`../backend/infra/frontend/Dockerfile`](../backend/infra/frontend/Dockerfile) 打包进 Nginx 镜像，容器端口 80，映射到宿主机 8088。完整应用启动方式见[后端部署说明](../backend/infra/README.md)，统一目录与构建入口见[仓库首页](../README.md)。
 
 ## 品牌
 
