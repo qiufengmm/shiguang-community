@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quanxiaoha.xiaohashu.comment.biz.domain.mapper.CommentOutboxMapper">
+  <resultMap id="CommentOutboxResultMap" type="com.quanxiaoha.xiaohashu.comment.biz.domain.dataobject.CommentOutboxDO">
+    <id column="id" property="id" jdbcType="BIGINT" />
+    <result column="event_key" property="eventKey" jdbcType="VARCHAR" />
+    <result column="topic" property="topic" jdbcType="VARCHAR" />
+    <result column="payload" property="payload" jdbcType="LONGVARCHAR" />
+    <result column="status" property="status" jdbcType="VARCHAR" />
+    <result column="attempt_count" property="attemptCount" jdbcType="INTEGER" />
+    <result column="next_attempt_at" property="nextAttemptAt" jdbcType="TIMESTAMP" />
+    <result column="last_error" property="lastError" jdbcType="VARCHAR" />
+    <result column="lease_owner" property="leaseOwner" jdbcType="VARCHAR" />
+    <result column="lease_until" property="leaseUntil" jdbcType="TIMESTAMP" />
+    <result column="lease_version" property="leaseVersion" jdbcType="BIGINT" />
+    <result column="created_time" property="createdTime" jdbcType="TIMESTAMP" />
+    <result column="updated_time" property="updatedTime" jdbcType="TIMESTAMP" />
+    <result column="sent_time" property="sentTime" jdbcType="TIMESTAMP" />
+  </resultMap>
+  <sql id="Columns">
+    id, event_key, topic, payload, status, attempt_count, next_attempt_at, last_error,
+    lease_owner, lease_until, lease_version, created_time, updated_time, sent_time
+  </sql>
+  <insert id="insertIfAbsent" parameterType="com.quanxiaoha.xiaohashu.comment.biz.domain.dataobject.CommentOutboxDO">
+    INSERT INTO t_comment_outbox
+      (event_key, topic, payload, status, attempt_count, next_attempt_at, lease_version, created_time, updated_time)
+    VALUES
+      (#{eventKey}, #{topic}, #{payload}, 'PENDING', 0, NOW(), 0, NOW(), NOW())
+    ON DUPLICATE KEY UPDATE id = id
+  </insert>
+  <select id="selectByEventKey" resultMap="CommentOutboxResultMap">
+    SELECT <include refid="Columns" /> FROM t_comment_outbox WHERE event_key = #{eventKey}
+  </select>
+  <select id="existsByEventKey" resultType="int">
+    SELECT COUNT(1) FROM t_comment_outbox WHERE event_key = #{eventKey}
+  </select>
+  <select id="selectClaimable" resultMap="CommentOutboxResultMap">
+    SELECT <include refid="Columns" />
+    FROM t_comment_outbox
+    WHERE (status = 'PENDING' AND next_attempt_at &lt;= #{now})
+       OR (status = 'SENDING' AND lease_until &lt;= #{now})
+    ORDER BY id ASC
+    LIMIT #{limit}
+    FOR UPDATE SKIP LOCKED
+  </select>
+  <update id="acquireLease">
+    UPDATE t_comment_outbox
+    SET status = 'SENDING', attempt_count = attempt_count + 1,
+        lease_owner = #{owner}, lease_until = #{leaseUntil}, lease_version = lease_version + 1,
+        updated_time = #{now}
+    WHERE id = #{id}
+      AND ((status = 'PENDING' AND next_attempt_at &lt;= #{now})
+        OR (status = 'SENDING' AND lease_until &lt;= #{now}))
+  </update>
+  <update id="markSent">
+    UPDATE t_comment_outbox
+    SET status = 'SENT', sent_time = #{sentTime}, lease_owner = NULL, lease_until = NULL,
+        last_error = NULL, updated_time = #{sentTime}
+    WHERE id = #{id} AND status = 'SENDING' AND lease_owner = #{owner} AND lease_version = #{leaseVersion}
+  </update>
+  <update id="scheduleRetry">
+    UPDATE t_comment_outbox
+    SET status = 'PENDING', next_attempt_at = #{nextAttemptAt}, last_error = #{lastError},
+        lease_owner = NULL, lease_until = NULL, updated_time = #{updatedTime}
+    WHERE id = #{id} AND status = 'SENDING' AND lease_owner = #{owner} AND lease_version = #{leaseVersion}
+  </update>
+  <update id="scrubSentPayloadsBefore">
+    UPDATE t_comment_outbox
+    SET payload = '', updated_time = NOW()
+    WHERE status = 'SENT' AND sent_time &lt; #{cutoff} AND payload != ''
+    ORDER BY sent_time ASC
+    LIMIT #{limit}
+  </update>
+</mapper>

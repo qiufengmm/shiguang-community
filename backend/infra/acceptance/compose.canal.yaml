@@ -1,0 +1,142 @@
+name: ${COMPOSE_PROJECT_NAME:?required}
+
+x-acceptance-labels: &acceptance-labels
+  codex.acceptance.run: ${RUN_ID:?required}
+  codex.acceptance.project: xiaohashu
+
+services:
+  mysql:
+    image: mysql:8.0.27
+    restart: "no"
+    mem_limit: 384m
+    labels: *acceptance-labels
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?required}
+      MYSQL_DATABASE: xiaohashu
+      TZ: Asia/Shanghai
+    command:
+      - mysqld
+      - --server-id=14321
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+      - --binlog-row-image=FULL
+      - --binlog_expire_logs_seconds=86400
+      - --innodb-buffer-pool-size=64M
+      - --performance-schema=OFF
+      - --max-connections=80
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: [CMD-SHELL, 'mysqladmin ping -h 127.0.0.1 -uroot -p"$${MYSQL_ROOT_PASSWORD}" --silent']
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 25s
+
+  elasticsearch:
+    image: elasticsearch:7.3.0
+    restart: "no"
+    mem_limit: 896m
+    labels: *acceptance-labels
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms256m -Xmx256m -XX:ActiveProcessorCount=2
+      TZ: Asia/Shanghai
+    ulimits:
+      memlock: {soft: -1, hard: -1}
+      nofile: {soft: 65536, hard: 65536}
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: [CMD-SHELL, 'curl -fsS "http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=5s" >/dev/null']
+      interval: 10s
+      timeout: 8s
+      retries: 24
+      start_period: 40s
+
+  canal:
+    image: canal/canal-server:v1.1.7
+    restart: "no"
+    mem_limit: 384m
+    labels: *acceptance-labels
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      canal.instance.master.address: mysql:3306
+      canal.instance.dbUsername: canal
+      canal.instance.dbPassword: ${CANAL_DB_PASSWORD:?required}
+      canal.instance.connectionCharset: UTF-8
+      canal.instance.tsdb.enable: "true"
+      canal.instance.gtidon: "false"
+      canal.instance.filter.regex: 'xiaohashu\\..*'
+      TZ: Asia/Shanghai
+    volumes:
+      - canal-meta:/home/admin/canal-server/conf/example
+    healthcheck:
+      test: [CMD-SHELL, 'nc -z 127.0.0.1 11111']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 45s
+
+  search:
+    image: xiaohashu/search:local
+    restart: "no"
+    init: true
+    mem_limit: 448m
+    labels: *acceptance-labels
+    environment:
+      SPRING_PROFILES_ACTIVE: dev,docker
+      SPRING_CONFIG_ADDITIONAL_LOCATION: optional:file:/app/config/
+      SPRING_CLOUD_NACOS_CONFIG_ENABLED: "false"
+      SPRING_CLOUD_NACOS_DISCOVERY_ENABLED: "false"
+      SERVER_PORT: "8092"
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:?required}
+      JAVA_TOOL_OPTIONS: -Xms32m -Xmx160m -Xss320k -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=32m -XX:ActiveProcessorCount=2 -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai
+    volumes:
+      - type: bind
+        source: ${APP_CONFIG_FILE:?required}
+        target: /app/config/application-docker.yml
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${DICTIONARY_FILE:?required}
+        target: /app/dictionary/mydict_hot_update.dic
+        read_only: true
+        bind: {create_host_path: false}
+    ports:
+      - target: 8092
+        published: "0"
+        host_ip: 127.0.0.1
+        protocol: tcp
+    depends_on:
+      mysql:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      canal:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8092'"]
+      interval: 10s
+      timeout: 3s
+      retries: 24
+      start_period: 45s
+
+networks:
+  default:
+    name: ${COMPOSE_PROJECT_NAME:?required}
+    labels: *acceptance-labels
+
+volumes:
+  mysql-data:
+    name: ${COMPOSE_PROJECT_NAME:?required}-mysql
+    labels: *acceptance-labels
+  elasticsearch-data:
+    name: ${COMPOSE_PROJECT_NAME:?required}-elasticsearch
+    labels: *acceptance-labels
+  canal-meta:
+    name: ${COMPOSE_PROJECT_NAME:?required}-canal-meta
+    labels: *acceptance-labels

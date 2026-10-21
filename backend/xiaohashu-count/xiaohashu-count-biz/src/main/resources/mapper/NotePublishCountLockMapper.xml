@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quanxiaoha.xiaohashu.count.biz.domain.mapper.NotePublishCountLockMapper">
+  <insert id="ensureLockRow">
+    INSERT IGNORE INTO t_note_publish_count_lock (user_id) VALUES (#{userId})
+  </insert>
+  <select id="lockByUserId" resultType="java.lang.Long">
+    SELECT user_id FROM t_note_publish_count_lock WHERE user_id = #{userId} FOR UPDATE
+  </select>
+</mapper>

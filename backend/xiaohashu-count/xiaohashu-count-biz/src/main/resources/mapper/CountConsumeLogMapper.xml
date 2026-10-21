@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quanxiaoha.xiaohashu.count.biz.domain.mapper.CountConsumeLogMapper">
+
+  <!-- 主键冲突说明这条消息已经应用过，返回 0，调用方据此跳过整批增量 -->
+  <insert id="insertIgnore">
+    INSERT IGNORE INTO t_count_consume_log
+      (msg_id, consumer_group, topic, created_time)
+    VALUES
+      (#{msgId}, #{consumerGroup}, #{topic}, NOW())
+  </insert>
+
+</mapper>

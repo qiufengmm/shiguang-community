@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: xiaohashu-user
+  profiles:
+    active: dev
+  cloud:
+    nacos:
+      discovery:
+        enabled: true
+        group: DEFAULT_GROUP
+        namespace: xiaohashu
+        server-addr: 127.0.0.1:8848
+    sentinel:
+      transport:
+        port: 8719
+        dashboard: 127.0.0.1:8060
+      datasource:
+        degrade:
+          nacos:
+            serverAddr: http://127.0.0.1:8848
+            namespace: xiaohashu
+            groupId: DEFAULT_GROUP
+            dataId: sentinel-user
+            ruleType: degrade
+
+feign:
+  sentinel:
+    enabled: true

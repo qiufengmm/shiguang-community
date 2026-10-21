@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quanxiaoha.xiaohashu.note.biz.domain.mapper.NoteContentSagaMapper">
+  <resultMap id="NoteContentSagaResultMap" type="com.quanxiaoha.xiaohashu.note.biz.domain.dataobject.NoteContentSagaDO">
+    <id column="id" property="id" jdbcType="BIGINT" />
+    <result column="operation_id" property="operationId" jdbcType="VARCHAR" />
+    <result column="note_id" property="noteId" jdbcType="BIGINT" />
+    <result column="operation_type" property="operationType" jdbcType="VARCHAR" />
+    <result column="content_uuid" property="contentUuid" jdbcType="VARCHAR" />
+    <result column="payload" property="payload" jdbcType="LONGVARCHAR" />
+    <result column="status" property="status" jdbcType="VARCHAR" />
+    <result column="attempt_count" property="attemptCount" jdbcType="INTEGER" />
+    <result column="next_attempt_at" property="nextAttemptAt" jdbcType="TIMESTAMP" />
+    <result column="last_error" property="lastError" jdbcType="VARCHAR" />
+    <result column="lease_owner" property="leaseOwner" jdbcType="VARCHAR" />
+    <result column="lease_until" property="leaseUntil" jdbcType="TIMESTAMP" />
+    <result column="lease_version" property="leaseVersion" jdbcType="BIGINT" />
+    <result column="created_time" property="createdTime" jdbcType="TIMESTAMP" />
+    <result column="updated_time" property="updatedTime" jdbcType="TIMESTAMP" />
+    <result column="completed_time" property="completedTime" jdbcType="TIMESTAMP" />
+  </resultMap>
+  <sql id="Columns">
+    id, operation_id, note_id, operation_type, content_uuid, payload, status,
+    attempt_count, next_attempt_at, last_error, lease_owner, lease_until,
+    lease_version, created_time, updated_time, completed_time
+  </sql>
+  <insert id="insertIfAbsent" parameterType="com.quanxiaoha.xiaohashu.note.biz.domain.dataobject.NoteContentSagaDO">
+    INSERT INTO t_note_content_saga
+      (operation_id, note_id, operation_type, content_uuid, payload, status,
+       attempt_count, next_attempt_at, lease_version, created_time, updated_time)
+    VALUES
+      (#{operationId}, #{noteId}, #{operationType}, #{contentUuid}, #{payload},
+       'PENDING', 0, NOW(), 0, NOW(), NOW())
+    ON DUPLICATE KEY UPDATE id = id
+  </insert>
+  <select id="selectByOperationIdForUpdate" resultMap="NoteContentSagaResultMap">
+    SELECT <include refid="Columns" /> FROM t_note_content_saga
+    WHERE operation_id = #{operationId} FOR UPDATE
+  </select>
+  <select id="selectByOperationId" resultMap="NoteContentSagaResultMap">
+    SELECT <include refid="Columns" /> FROM t_note_content_saga
+    WHERE operation_id = #{operationId}
+  </select>
+  <select id="selectActiveLeaseForUpdate" resultType="java.lang.Long">
+    SELECT id FROM t_note_content_saga
+    WHERE id = #{id} AND status = 'PENDING'
+      AND lease_owner = #{owner} AND lease_version = #{leaseVersion}
+      AND lease_until &gt; NOW()
+    FOR UPDATE
+  </select>
+  <insert id="upsertCompensationPending" parameterType="com.quanxiaoha.xiaohashu.note.biz.domain.dataobject.NoteContentSagaDO">
+    INSERT INTO t_note_content_saga
+      (operation_id, note_id, operation_type, content_uuid, payload, status,
+       attempt_count, next_attempt_at, last_error, lease_version, created_time, updated_time)
+    VALUES
+      (#{operationId}, #{noteId}, 'COMPENSATE', #{contentUuid}, NULL, 'COMPENSATION_PENDING',
+       0, NOW(), #{lastError}, 0, NOW(), NOW())
+    ON DUPLICATE KEY UPDATE
+      note_id = VALUES(note_id), operation_type = 'COMPENSATE',
+      content_uuid = VALUES(content_uuid), payload = NULL,
+      status = 'COMPENSATION_PENDING', attempt_count = 0,
+      next_attempt_at = NOW(), last_error = VALUES(last_error),
+      lease_owner = NULL, lease_until = NULL, lease_version = lease_version + 1,
+      completed_time = NULL, updated_time = NOW()
+  </insert>
+  <select id="selectClaimable" resultMap="NoteContentSagaResultMap">
+    SELECT <include refid="Columns" /> FROM t_note_content_saga
+    WHERE status IN ('PENDING', 'DELETE_PENDING', 'COMPENSATION_PENDING')
+      AND next_attempt_at &lt;= #{now}
+      AND (lease_until IS NULL OR lease_until &lt;= #{now})
+    ORDER BY id ASC
+    LIMIT #{limit}
+    FOR UPDATE SKIP LOCKED
+  </select>
+  <update id="acquireLease">
+    UPDATE t_note_content_saga
+    SET attempt_count = attempt_count + 1,
+        lease_owner = #{owner}, lease_until = #{leaseUntil},
+        lease_version = lease_version + 1, updated_time = #{now}
+    WHERE id = #{id}
+      AND status IN ('PENDING', 'DELETE_PENDING', 'COMPENSATION_PENDING')
+      AND (lease_until IS NULL OR lease_until &lt;= #{now})
+      AND next_attempt_at &lt;= #{now}
+  </update>
+  <update id="markCompleted">
+    UPDATE t_note_content_saga
+    SET status = 'COMPLETED', payload = NULL, completed_time = #{now},
+        lease_owner = NULL, lease_until = NULL, last_error = NULL, updated_time = #{now}
+    WHERE id = #{id} AND status IN ('PENDING', 'DELETE_PENDING', 'COMPENSATION_PENDING')
+      AND lease_owner = #{owner} AND lease_version = #{leaseVersion}
+  </update>
+  <update id="markDeletePending">
+    UPDATE t_note_content_saga
+    SET status = 'DELETE_PENDING', content_uuid = #{contentUuid}, payload = NULL,
+        next_attempt_at = #{now}, last_error = NULL,
+        lease_owner = NULL, lease_until = NULL, updated_time = #{now}
+    WHERE id = #{id} AND status = 'PENDING'
+      AND lease_owner = #{owner} AND lease_version = #{leaseVersion}
+  </update>
+  <update id="markCompensationPending">
+    UPDATE t_note_content_saga
+    SET status = 'COMPENSATION_PENDING', content_uuid = #{contentUuid}, payload = NULL,
+        next_attempt_at = #{now}, last_error = #{error},
+        lease_owner = NULL, lease_until = NULL, updated_time = #{now}
+    WHERE id = #{id} AND status = 'PENDING'
+      AND lease_owner = #{owner} AND lease_version = #{leaseVersion}
+  </update>
+  <update id="markRolledBack">
+    UPDATE t_note_content_saga
+    SET status = 'ROLLED_BACK', payload = NULL, completed_time = #{now},
+        lease_owner = NULL, lease_until = NULL, last_error = NULL, updated_time = #{now}
+    WHERE id = #{id} AND status = 'COMPENSATION_PENDING'
+      AND lease_owner = #{owner} AND lease_version = #{leaseVersion}
+  </update>
+  <update id="scheduleRetry">
+    UPDATE t_note_content_saga
+    SET next_attempt_at = #{nextAttemptAt}, last_error = #{error},
+        lease_owner = NULL, lease_until = NULL, updated_time = #{now}
+    WHERE id = #{id} AND status IN ('PENDING', 'DELETE_PENDING', 'COMPENSATION_PENDING')
+      AND lease_owner = #{owner} AND lease_version = #{leaseVersion}
+  </update>
+</mapper>

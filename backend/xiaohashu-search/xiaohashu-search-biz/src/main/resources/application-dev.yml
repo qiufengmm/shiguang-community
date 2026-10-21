@@ -1,0 +1,19 @@
+elasticsearch:
+  address: 127.0.0.1:9200
+  hotUpdateExtDict: 'F:\docker\elasticsearch\config\analysis-ik\custom\mydict_hot_update.dic'
+
+canal: # Canal configuration
+  address: 127.0.0.1:11111
+  destination: example
+  username: canal
+  password: canal
+  subscribe: xiaohashu.t_note,xiaohashu.t_user,xiaohashu.t_note_count,xiaohashu.t_user_count
+  batchSize: 1000
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${MYSQL_URL:jdbc:mysql://127.0.0.1:3306/xiaohashu?useUnicode=true&characterEncoding=utf-8&autoReconnect=true&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:123456}
+    type: com.alibaba.druid.pool.DruidDataSource

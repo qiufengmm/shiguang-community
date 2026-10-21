@@ -1,0 +1,12 @@
+[
+  {
+    "resource": "findUserCountData",
+    "limitApp": "default",
+    "grade": 1,
+    "count": 10,
+    "strategy": 2,
+    "refResource": "/count/user/data",
+    "controlBehavior": 0,
+    "clusterMode": false
+  }
+]

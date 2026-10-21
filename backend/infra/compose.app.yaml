@@ -1,0 +1,334 @@
+# Merge with compose.yaml. All containers appear in the same Docker Desktop app.
+x-app-env: &app-env
+  SPRING_PROFILES_ACTIVE: dev,docker
+  SPRING_CONFIG_ADDITIONAL_LOCATION: optional:file:/app/config/
+  SPRING_CLOUD_NACOS_CONFIG_ENABLED: "false"
+  MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+  REDIS_PASSWORD: ${REDIS_PASSWORD}
+  MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+  MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+  JAVA_TOOL_OPTIONS: -Xms32m -Xmx192m -Xss320k -XX:+UseSerialGC -XX:MaxMetaspaceSize=144m -XX:MaxDirectMemorySize=48m -XX:ActiveProcessorCount=2 -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai
+x-app: &app
+  restart: unless-stopped
+  init: true
+  mem_limit: 420m
+  environment: *app-env
+  volumes:
+    - type: bind
+      source: ./docker/application-docker.yml
+      target: /app/config/application-docker.yml
+      read_only: true
+      bind: {create_host_path: false}
+  healthcheck:
+    test: [CMD-SHELL, "bash -c 'exec 3<>/dev/tcp/127.0.0.1/$${SERVER_PORT}'"]
+    interval: 15s
+    timeout: 3s
+    retries: 16
+    start_period: 60s
+
+services:
+  mysql:
+    mem_limit: 448m
+    command: [mysqld, --innodb-buffer-pool-size=128M, --performance-schema=OFF, --max-connections=180, --server-id=1, --log-bin=mysql-bin, --binlog-format=ROW, --binlog-row-image=FULL]
+  redis:
+    mem_limit: 256m
+    volumes:
+      - type: bind
+        source: ./.runtime/redis.conf
+        target: /usr/local/etc/redis/redis.conf
+        read_only: true
+        bind: {create_host_path: false}
+    healthcheck:
+      test: [CMD-SHELL, 'REDISCLI_AUTH="$${REDIS_PASSWORD}" redis-cli ping | grep PONG']
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+  nacos:
+    mem_limit: 640m
+    environment:
+      JVM_XMS: 128m
+      JVM_XMX: 256m
+      JVM_XMN: 64m
+      JAVA_TOOL_OPTIONS: -XX:-UseContainerSupport -XX:ActiveProcessorCount=2
+    volumes:
+      - type: bind
+        source: ./.runtime/nacos.properties
+        target: /home/nacos/conf/application.properties
+        read_only: true
+        bind: {create_host_path: false}
+    healthcheck:
+      test: [CMD-SHELL, 'curl -fsS http://127.0.0.1:8848/nacos/v1/console/health/readiness']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+  minio:
+    mem_limit: 256m
+  minio-init:
+    image: quay.io/minio/mc:RELEASE.2025-05-21T01-59-54Z
+    restart: "no"
+    depends_on:
+      minio: {condition: service_healthy}
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - 'until mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" >/dev/null 2>&1; do sleep 2; done; mc mb --ignore-existing local/xiaohashu-local; mc anonymous set download local/xiaohashu-local'
+  cassandra:
+    mem_limit: 1152m
+    volumes:
+      # The official entrypoint chowns this file before switching user.
+      - type: bind
+        source: ./.runtime/jvm-server.options
+        target: /etc/cassandra/jvm-server.options
+        bind: {create_host_path: false}
+    environment:
+      MAX_HEAP_SIZE: 512M
+      HEAP_NEWSIZE: 100M
+    healthcheck:
+      test: [CMD-SHELL, 'cqlsh --request-timeout=5 -e "SELECT release_version FROM system.local" >/dev/null']
+      interval: 20s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+  zookeeper:
+    mem_limit: 192m
+    environment:
+      JVMFLAGS: -Xms32m -Xmx96m
+    healthcheck:
+      test: [CMD-SHELL, "bash -c 'exec 3<>/dev/tcp/127.0.0.1/2181'"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+  rocketmq-namesrv:
+    mem_limit: 256m
+    environment:
+      JAVA_OPT_EXT: -Xms64m -Xmx128m -Xmn32m -XX:ActiveProcessorCount=2
+    healthcheck:
+      test: [CMD-SHELL, "bash -c 'exec 3<>/dev/tcp/127.0.0.1/9876'"]
+      interval: 10s
+      timeout: 3s
+      retries: 16
+  rocketmq-broker:
+    mem_limit: 576m
+    environment:
+      JAVA_OPT_EXT: -Xms128m -Xmx256m -Xmn64m -XX:MaxDirectMemorySize=96m -XX:ActiveProcessorCount=2
+    volumes:
+      - type: bind
+        source: ./docker/broker.conf
+        target: /home/rocketmq/rocketmq-5.3.1/conf/broker.conf
+        read_only: true
+        bind: {create_host_path: false}
+    healthcheck:
+      test: [CMD-SHELL, "bash -c 'exec 3<>/dev/tcp/127.0.0.1/10911'"]
+      interval: 10s
+      timeout: 3s
+      retries: 16
+      start_period: 30s
+  elasticsearch:
+    mem_limit: 896m
+    environment:
+      ES_JAVA_OPTS: -Xms384m -Xmx384m -XX:ActiveProcessorCount=2
+    healthcheck:
+      test: [CMD-SHELL, 'curl -fsS http://127.0.0.1:9200/_cluster/health >/dev/null']
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+  canal:
+    mem_limit: 384m
+    volumes:
+      - type: bind
+        source: ./.runtime/canal-example
+        target: /home/admin/canal-server/conf/example
+        bind: {create_host_path: false}
+    environment:
+      JAVA_OPTS: -Xms64m -Xmx192m -XX:NewSize=32m -XX:MaxNewSize=64m
+  xxl-job-admin:
+    mem_limit: 320m
+    environment:
+      JAVA_OPTS: -Xms32m -Xmx160m -XX:ActiveProcessorCount=2
+  sentinel-dashboard:
+    mem_limit: 256m
+    environment:
+      JAVA_TOOL_OPTIONS: -Xms32m -Xmx128m -XX:ActiveProcessorCount=2
+  kibana:
+    profiles: [tools]
+    mem_limit: 512m
+  es-head:
+    profiles: [tools]
+  rocketmq-dashboard:
+    profiles: [tools]
+    mem_limit: 320m
+  distributed-id-generator:
+    <<: *app
+    image: xiaohashu/distributed-id-generator:local
+    # 只为宿主机上的 JMeter GUI / curl 调试暴露，绑 127.0.0.1 不对局域网开放。
+    # 正式压测仍走容器网络（docker run --network xiaohashu_default），不受此影响。
+    ports:
+      - "127.0.0.1:8085:8085"
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8085"
+    volumes:
+      - type: bind
+        source: ./docker/application-docker.yml
+        target: /app/config/application-docker.yml
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ./.runtime/leaf.properties
+        target: /app/config/leaf.properties
+        read_only: true
+        bind: {create_host_path: false}
+    depends_on:
+      mysql: {condition: service_healthy}
+      zookeeper: {condition: service_healthy}
+      nacos: {condition: service_healthy}
+  oss:
+    <<: *app
+    image: xiaohashu/oss:local
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8081"
+    depends_on:
+      nacos: {condition: service_healthy}
+      minio-init: {condition: service_completed_successfully}
+  kv:
+    <<: *app
+    image: xiaohashu/kv:local
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8084"
+    depends_on:
+      nacos: {condition: service_healthy}
+      cassandra: {condition: service_healthy}
+      rocketmq-broker: {condition: service_healthy}
+  user:
+    <<: *app
+    image: xiaohashu/user:local
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8082"
+    depends_on:
+      nacos: {condition: service_healthy}
+      mysql: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      rocketmq-broker: {condition: service_healthy}
+      distributed-id-generator: {condition: service_healthy}
+  count:
+    <<: *app
+    image: xiaohashu/count:local
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8090"
+    depends_on:
+      nacos: {condition: service_healthy}
+      mysql: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      rocketmq-broker: {condition: service_healthy}
+  auth:
+    <<: *app
+    image: xiaohashu/auth:local
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8080"
+      # Optional credentials come from the shell running Compose; never commit them.
+      ALIYUN_ACCESS_KEY_ID: ${ALIYUN_ACCESS_KEY_ID:-}
+      ALIYUN_ACCESS_KEY_SECRET: ${ALIYUN_ACCESS_KEY_SECRET:-}
+    depends_on:
+      user: {condition: service_healthy}
+      redis: {condition: service_healthy}
+  note:
+    <<: *app
+    image: xiaohashu/note:local
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8086"
+    depends_on:
+      user: {condition: service_healthy}
+      count: {condition: service_healthy}
+      kv: {condition: service_healthy}
+  user-relation:
+    <<: *app
+    image: xiaohashu/user-relation:local
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8087"
+    depends_on:
+      user: {condition: service_healthy}
+      count: {condition: service_healthy}
+  comment:
+    <<: *app
+    image: xiaohashu/comment:local
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8093"
+    depends_on:
+      user: {condition: service_healthy}
+      count: {condition: service_healthy}
+      kv: {condition: service_healthy}
+  search:
+    <<: *app
+    image: xiaohashu/search:local
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8092"
+    volumes:
+      - type: bind
+        source: ./docker/application-docker.yml
+        target: /app/config/application-docker.yml
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/elasticsearch/config/analysis-ik/custom
+        target: /app/dictionary
+        read_only: true
+        bind: {create_host_path: false}
+    depends_on:
+      nacos: {condition: service_healthy}
+      mysql: {condition: service_healthy}
+      elasticsearch: {condition: service_healthy}
+      canal: {condition: service_healthy}
+  data-align:
+    <<: *app
+    image: xiaohashu/data-align:local
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8091"
+    depends_on:
+      nacos: {condition: service_healthy}
+      mysql: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      rocketmq-broker: {condition: service_healthy}
+      xxl-job-admin: {condition: service_healthy}
+  gateway:
+    <<: *app
+    image: xiaohashu/gateway:local
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8000"
+    ports: ["127.0.0.1:${GATEWAY_HOST_PORT:-8000}:8000"]
+    depends_on:
+      auth: {condition: service_healthy}
+      note: {condition: service_healthy}
+      comment: {condition: service_healthy}
+      user-relation: {condition: service_healthy}
+      search: {condition: service_healthy}
+      oss: {condition: service_healthy}
+  frontend:
+    image: xiaohashu/frontend:local
+    restart: unless-stopped
+    mem_limit: 64m
+    ports:
+      - "${XIAOHASHU_UI_BIND_ADDR:-0.0.0.0}:${XIAOHASHU_UI_HOST_PORT:-8088}:80"
+    depends_on:
+      gateway: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1/healthz]
+      interval: 15s
+      timeout: 3s
+      retries: 4

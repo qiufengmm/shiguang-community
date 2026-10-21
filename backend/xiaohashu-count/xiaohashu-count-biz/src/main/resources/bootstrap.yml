@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: xiaohashu-count
+  profiles:
+    active: dev
+  cloud:
+    nacos:
+      config:
+        server-addr: http://127.0.0.1:8848
+        prefix: ${spring.application.name}
+        group: DEFAULT_GROUP
+        namespace: xiaohashu
+        file-extension: yaml
+        refresh-enabled: true
+      discovery:
+        enabled: true
+        group: DEFAULT_GROUP
+        namespace: xiaohashu
+        server-addr: 127.0.0.1:8848
+    sentinel:
+      web-context-unify: false
+      transport:
+        port: 8719 # Sentinel 客户端 HTTP Server 端口
+        dashboard: 127.0.0.1:8060 # Sentinel 控制台地址
+      datasource:
+        nacos:
+          nacos:
+            serverAddr: http://127.0.0.1:8848
+            namespace: xiaohashu
+            groupId: DEFAULT_GROUP
+            dataId: sentinel-count
+            ruleType: flow

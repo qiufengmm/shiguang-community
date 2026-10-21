@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quanxiaoha.xiaohashu.comment.biz.domain.mapper.CommentDOMapper">
+  <resultMap id="BaseResultMap" type="com.quanxiaoha.xiaohashu.comment.biz.domain.dataobject.CommentDO">
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="note_id" jdbcType="BIGINT" property="noteId" />
+    <result column="user_id" jdbcType="BIGINT" property="userId" />
+    <result column="content_uuid" jdbcType="VARCHAR" property="contentUuid" />
+    <result column="is_content_empty" jdbcType="BIT" property="isContentEmpty" />
+    <result column="image_url" jdbcType="VARCHAR" property="imageUrl" />
+    <result column="level" jdbcType="TINYINT" property="level" />
+    <result column="reply_total" jdbcType="BIGINT" property="replyTotal" />
+    <result column="like_total" jdbcType="BIGINT" property="likeTotal" />
+    <result column="child_comment_total" jdbcType="BIGINT" property="childCommentTotal" />
+    <result column="heat" jdbcType="DECIMAL" property="heat" />
+    <result column="first_reply_comment_id" jdbcType="BIGINT" property="firstReplyCommentId" />
+    <result column="parent_id" jdbcType="BIGINT" property="parentId" />
+    <result column="reply_comment_id" jdbcType="BIGINT" property="replyCommentId" />
+    <result column="reply_user_id" jdbcType="BIGINT" property="replyUserId" />
+    <result column="is_top" jdbcType="TINYINT" property="isTop" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+  </resultMap>
+  <sql id="Base_Column_List">
+    id, note_id, user_id, content_uuid, is_content_empty, image_url, `level`, reply_total,
+    like_total, parent_id, reply_comment_id, reply_user_id, is_top, create_time, update_time,
+    first_reply_comment_id
+  </sql>
+  <select id="selectByPrimaryKey" parameterType="java.lang.Long" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from t_comment
+    where id = #{id,jdbcType=BIGINT}
+  </select>
+  <select id="selectByPrimaryKeyForUpdate" parameterType="java.lang.Long" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from t_comment
+    where id = #{id,jdbcType=BIGINT}
+    for update
+  </select>
+  <select id="selectByReplyCommentId" resultMap="BaseResultMap" parameterType="long">
+    select
+    <include refid="Base_Column_List" />
+    from t_comment
+    where reply_comment_id = #{commentId}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
+    delete from t_comment
+    where id = #{id,jdbcType=BIGINT}
+  </delete>
+  <delete id="deleteByParentId" parameterType="long">
+    delete from t_comment
+    where parent_id = #{commentId}
+  </delete>
+  <delete id="deleteByIds" parameterType="map">
+    delete from t_comment
+    where id in
+    <foreach collection="commentIds" item="commentId" open="(" separator="," close=")">
+      #{commentId}
+    </foreach>
+  </delete>
+  <insert id="insert" parameterType="com.quanxiaoha.xiaohashu.comment.biz.domain.dataobject.CommentDO">
+    insert into t_comment (id, note_id, user_id,
+      content_uuid, is_content_empty, image_url,
+      `level`, reply_total, like_total,
+      parent_id, reply_comment_id, reply_user_id,
+      is_top, create_time, update_time
+      )
+    values (#{id,jdbcType=BIGINT}, #{noteId,jdbcType=BIGINT}, #{userId,jdbcType=BIGINT},
+      #{contentUuid,jdbcType=VARCHAR}, #{isContentEmpty,jdbcType=BIT}, #{imageUrl,jdbcType=VARCHAR},
+      #{level,jdbcType=TINYINT}, #{replyTotal,jdbcType=BIGINT}, #{likeTotal,jdbcType=BIGINT},
+      #{parentId,jdbcType=BIGINT}, #{replyCommentId,jdbcType=BIGINT}, #{replyUserId,jdbcType=BIGINT},
+      #{isTop,jdbcType=TINYINT}, #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP}
+      )
+  </insert>
+  <insert id="insertSelective" parameterType="com.quanxiaoha.xiaohashu.comment.biz.domain.dataobject.CommentDO">
+    insert into t_comment
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="id != null">
+        id,
+      </if>
+      <if test="noteId != null">
+        note_id,
+      </if>
+      <if test="userId != null">
+        user_id,
+      </if>
+      <if test="contentUuid != null">
+        content_uuid,
+      </if>
+      <if test="isContentEmpty != null">
+        is_content_empty,
+      </if>
+      <if test="imageUrl != null">
+        image_url,
+      </if>
+      <if test="level != null">
+        `level`,
+      </if>
+      <if test="replyTotal != null">
+        reply_total,
+      </if>
+      <if test="likeTotal != null">
+        like_total,
+      </if>
+      <if test="parentId != null">
+        parent_id,
+      </if>
+      <if test="replyCommentId != null">
+        reply_comment_id,
+      </if>
+      <if test="replyUserId != null">
+        reply_user_id,
+      </if>
+      <if test="isTop != null">
+        is_top,
+      </if>
+      <if test="createTime != null">
+        create_time,
+      </if>
+      <if test="updateTime != null">
+        update_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="id != null">
+        #{id,jdbcType=BIGINT},
+      </if>
+      <if test="noteId != null">
+        #{noteId,jdbcType=BIGINT},
+      </if>
+      <if test="userId != null">
+        #{userId,jdbcType=BIGINT},
+      </if>
+      <if test="contentUuid != null">
+        #{contentUuid,jdbcType=VARCHAR},
+      </if>
+      <if test="isContentEmpty != null">
+        #{isContentEmpty,jdbcType=BIT},
+      </if>
+      <if test="imageUrl != null">
+        #{imageUrl,jdbcType=VARCHAR},
+      </if>
+      <if test="level != null">
+        #{level,jdbcType=TINYINT},
+      </if>
+      <if test="replyTotal != null">
+        #{replyTotal,jdbcType=BIGINT},
+      </if>
+      <if test="likeTotal != null">
+        #{likeTotal,jdbcType=BIGINT},
+      </if>
+      <if test="parentId != null">
+        #{parentId,jdbcType=BIGINT},
+      </if>
+      <if test="replyCommentId != null">
+        #{replyCommentId,jdbcType=BIGINT},
+      </if>
+      <if test="replyUserId != null">
+        #{replyUserId,jdbcType=BIGINT},
+      </if>
+      <if test="isTop != null">
+        #{isTop,jdbcType=TINYINT},
+      </if>
+      <if test="createTime != null">
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null">
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.quanxiaoha.xiaohashu.comment.biz.domain.dataobject.CommentDO">
+    update t_comment
+    <set>
+      <if test="noteId != null">
+        note_id = #{noteId,jdbcType=BIGINT},
+      </if>
+      <if test="userId != null">
+        user_id = #{userId,jdbcType=BIGINT},
+      </if>
+      <if test="contentUuid != null">
+        content_uuid = #{contentUuid,jdbcType=VARCHAR},
+      </if>
+      <if test="isContentEmpty != null">
+        is_content_empty = #{isContentEmpty,jdbcType=BIT},
+      </if>
+      <if test="imageUrl != null">
+        image_url = #{imageUrl,jdbcType=VARCHAR},
+      </if>
+      <if test="level != null">
+        `level` = #{level,jdbcType=TINYINT},
+      </if>
+      <if test="replyTotal != null">
+        reply_total = #{replyTotal,jdbcType=BIGINT},
+      </if>
+      <if test="likeTotal != null">
+        like_total = #{likeTotal,jdbcType=BIGINT},
+      </if>
+      <if test="parentId != null">
+        parent_id = #{parentId,jdbcType=BIGINT},
+      </if>
+      <if test="replyCommentId != null">
+        reply_comment_id = #{replyCommentId,jdbcType=BIGINT},
+      </if>
+      <if test="replyUserId != null">
+        reply_user_id = #{replyUserId,jdbcType=BIGINT},
+      </if>
+      <if test="isTop != null">
+        is_top = #{isTop,jdbcType=TINYINT},
+      </if>
+      <if test="createTime != null">
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null">
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.quanxiaoha.xiaohashu.comment.biz.domain.dataobject.CommentDO">
+    update t_comment
+    set note_id = #{noteId,jdbcType=BIGINT},
+      user_id = #{userId,jdbcType=BIGINT},
+      content_uuid = #{contentUuid,jdbcType=VARCHAR},
+      is_content_empty = #{isContentEmpty,jdbcType=BIT},
+      image_url = #{imageUrl,jdbcType=VARCHAR},
+      `level` = #{level,jdbcType=TINYINT},
+      reply_total = #{replyTotal,jdbcType=BIGINT},
+      like_total = #{likeTotal,jdbcType=BIGINT},
+      parent_id = #{parentId,jdbcType=BIGINT},
+      reply_comment_id = #{replyCommentId,jdbcType=BIGINT},
+      reply_user_id = #{replyUserId,jdbcType=BIGINT},
+      is_top = #{isTop,jdbcType=TINYINT},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_time = #{updateTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+
+  <select id="selectByCommentIds" resultMap="BaseResultMap" parameterType="list">
+    select id, user_id, content_uuid, is_content_empty, image_url, like_total,
+           is_top, create_time, first_reply_comment_id, child_comment_total,
+           `level`, parent_id, heat, note_id, reply_comment_id, reply_user_id
+    from t_comment
+    where id in
+    <foreach collection="commentIds" open="(" separator="," close=")" item="commentId">
+      #{commentId}
+    </foreach>
+  </select>
+  <select id="selectCommentCountByIds" resultMap="BaseResultMap" parameterType="list">
+    select id, child_comment_total, like_total, `level`
+    from t_comment
+    where id in
+    <foreach collection="commentIds" open="(" separator="," close=")" item="commentId">
+      #{commentId}
+    </foreach>
+  </select>
+  <insert id="batchInsert" parameterType="list">
+    insert IGNORE into t_comment (
+      id, note_id, user_id, content_uuid, is_content_empty, image_url, `level`, reply_total,
+      like_total, parent_id, reply_comment_id, reply_user_id, is_top, create_time, update_time
+    ) values
+    <foreach collection="commentDOS" item="commentDO" separator=",">
+      (
+        #{commentDO.id}, #{commentDO.noteId}, #{commentDO.userId}, #{commentDO.contentUuid},
+        #{commentDO.isContentEmpty}, #{commentDO.imageUrl}, #{commentDO.level}, #{commentDO.replyTotal},
+        #{commentDO.likeTotal}, #{commentDO.parentId}, #{commentDO.replyCommentId}, #{commentDO.replyUserId},
+        #{commentDO.isTop}, #{commentDO.createTime}, #{commentDO.updateTime}
+      )
+    </foreach>
+  </insert>
+  <insert id="insertIfAbsent" parameterType="com.quanxiaoha.xiaohashu.comment.biz.domain.dataobject.CommentDO">
+    INSERT IGNORE INTO t_comment
+      (id, note_id, user_id, content_uuid, is_content_empty, image_url, `level`, reply_total,
+       like_total, parent_id, reply_comment_id, reply_user_id, is_top, create_time, update_time)
+    VALUES
+      (#{id}, #{noteId}, #{userId}, #{contentUuid}, #{isContentEmpty}, #{imageUrl}, #{level}, #{replyTotal},
+       #{likeTotal}, #{parentId}, #{replyCommentId}, #{replyUserId}, #{isTop}, #{createTime}, #{updateTime})
+  </insert>
+  <select id="selectDeleteTreeByRootCommentId" resultMap="BaseResultMap">
+    WITH RECURSIVE comment_tree AS (
+      SELECT <include refid="Base_Column_List" />
+      FROM t_comment
+      WHERE id = #{commentId} OR (`level` = 2 AND parent_id = #{commentId})
+      UNION DISTINCT
+      SELECT child.id, child.note_id, child.user_id, child.content_uuid, child.is_content_empty,
+             child.image_url, child.`level`, child.reply_total, child.like_total, child.parent_id,
+             child.reply_comment_id, child.reply_user_id, child.is_top, child.create_time,
+             child.update_time, child.first_reply_comment_id
+      FROM t_comment child
+      JOIN comment_tree parent ON child.reply_comment_id = parent.id
+    )
+    SELECT * FROM comment_tree
+  </select>
+  <update id="updateChildCommentTotal" parameterType="map">
+    UPDATE t_comment
+    SET child_comment_total = GREATEST(0, child_comment_total + #{count}), update_time = NOW()
+    WHERE id = #{parentId} AND `level` = 1
+  </update>
+  <update id="batchUpdateHeatByCommentIds" parameterType="map">
+    UPDATE t_comment
+    SET heat = CASE id
+    <foreach collection="commentHeatBOS" item="bo" separator="">
+      WHEN #{bo.id} THEN #{bo.heat}
+    </foreach>
+    ELSE heat END
+    WHERE id IN
+    <foreach collection="commentIds" item="commentId" open="(" close=")" separator=",">
+      #{commentId}
+    </foreach>
+  </update>
+  <select id="selectEarliestByParentId" resultMap="BaseResultMap" parameterType="map">
+    select id from t_comment
+    where parent_id = #{parentId} and `level` = 2
+    order by create_time asc, id asc
+    limit 1
+  </select>
+  <update id="updateFirstReplyCommentIdByPrimaryKey" parameterType="map">
+    update t_comment
+    set first_reply_comment_id = #{firstReplyCommentId}
+    where id = #{id}
+  </update>
+  <select id="selectPageList" resultMap="BaseResultMap" parameterType="map">
+    select id, user_id, content_uuid, is_content_empty, image_url, like_total,
+           is_top, create_time, first_reply_comment_id, child_comment_total, heat
+    from t_comment
+    where note_id = #{noteId} and `level` = 1
+    order by heat desc, id desc
+    limit #{offset}, #{pageSize}
+  </select>
+  <select id="selectTwoLevelCommentByIds" resultMap="BaseResultMap" parameterType="list">
+    select id, user_id, content_uuid, is_content_empty, image_url, like_total, create_time, heat
+    from t_comment
+    where id in
+    <foreach collection="commentIds" open="(" separator="," close=")" item="commentId">
+      #{commentId}
+    </foreach>
+  </select>
+  <select id="selectHeatComments" resultMap="BaseResultMap" parameterType="java.lang.Long">
+    select id, heat
+    from t_comment
+    where note_id = #{noteId} and `level` = 1
+    order by heat desc, id desc
+    limit 500
+  </select>
+  <select id="selectChildCommentTotalById" resultType="long">
+    select child_comment_total from t_comment
+    where id = #{commentId} and level = 1
+  </select>
+  <select id="selectChildPageList" resultMap="BaseResultMap" parameterType="map">
+    select id, user_id, note_id, content_uuid, is_content_empty, image_url, like_total,
+           create_time, reply_user_id, parent_id, reply_comment_id
+    from t_comment
+    where parent_id = #{parentId} and level = 2 order by id asc
+    limit #{offset}, #{pageSize}
+  </select>
+  <select id="selectChildCommentsByParentIdAndLimit" resultMap="BaseResultMap" parameterType="map">
+    select id, create_time
+    from t_comment
+    where parent_id = #{parentId} and level = 2
+    order by id asc
+    limit #{limit}
+  </select>
+</mapper>

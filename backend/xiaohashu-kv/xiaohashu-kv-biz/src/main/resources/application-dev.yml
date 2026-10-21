@@ -1,0 +1,12 @@
+spring:
+  cassandra:
+    keyspace-name: xiaohashu
+    contact-points: 127.0.0.1
+    port: 9042
+    local-datacenter: datacenter1
+
+rocketmq:
+  name-server: 127.0.0.1:9876 # name server 地址
+  consumer:
+    group: xiaohashu_group
+    pull-batch-size: 5 # 每次拉取的最大消息数

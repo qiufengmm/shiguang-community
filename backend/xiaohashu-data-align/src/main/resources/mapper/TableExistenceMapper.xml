@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quanxiaoha.xiaohashu.data.align.domain.mapper.TableExistenceMapper">
+
+    <select id="selectExistingTableNames" resultType="java.lang.String">
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = DATABASE()
+          AND table_name IN
+        <foreach collection="tableNames" item="tableName" open="(" separator="," close=")">
+            #{tableName}
+        </foreach>
+    </select>
+
+</mapper>

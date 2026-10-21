@@ -1,0 +1,24 @@
+# Local credentials and deployment state
+.env
+.env.*
+.evn
+.evn.*
+!.env.example
+**/infra/.runtime/
+
+# Build products and dependency directories
+**/target/
+**/node_modules/
+**/dist/
+**/.flattened-pom.xml
+*.tsbuildinfo
+*.log
+**/logs/
+
+# Machine-specific editor and handoff files
+**/.idea/
+**/.vscode/
+.DS_Store
+/AGENTS.md
+/HANDOFF-CODEX.md
+/STATUS-HANDOFF.md

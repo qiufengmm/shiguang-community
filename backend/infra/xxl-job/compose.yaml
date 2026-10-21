@@ -1,0 +1,16 @@
+services:
+  xxl-job-admin:
+    image: xuxueli/xxl-job-admin:2.4.1
+    container_name: xxl-job-admin
+    restart: unless-stopped
+    ports:
+      - "7777:8080"
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:mysql://host.docker.internal:3306/xxl_job?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai"
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: "${XXL_JOB_MYSQL_PASSWORD:-123456}"
+    volumes:
+      - xxl-job-admin-logs:/data/applogs
+
+volumes:
+  xxl-job-admin-logs:

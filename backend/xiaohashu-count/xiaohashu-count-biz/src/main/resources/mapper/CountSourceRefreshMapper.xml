@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quanxiaoha.xiaohashu.count.biz.domain.mapper.CountSourceRefreshMapper">
+
+  <insert id="ensureUserCountRow">
+    INSERT INTO t_user_count (user_id) VALUES (#{userId})
+    ON DUPLICATE KEY UPDATE user_id = VALUES(user_id)
+  </insert>
+  <insert id="ensureNoteCountRow">
+    INSERT INTO t_note_count (note_id) VALUES (#{noteId})
+    ON DUPLICATE KEY UPDATE note_id = VALUES(note_id)
+  </insert>
+  <select id="lockUserCountRow" resultType="long">
+    SELECT user_id FROM t_user_count WHERE user_id = #{userId} FOR UPDATE
+  </select>
+  <select id="lockNoteCountRow" resultType="long">
+    SELECT note_id FROM t_note_count WHERE note_id = #{noteId} FOR UPDATE
+  </select>
+
+  <select id="selectFollowingTotal" resultType="long">
+    SELECT COUNT(*) FROM t_following WHERE user_id = #{userId}
+  </select>
+  <select id="selectFansTotal" resultType="long">
+    SELECT COUNT(*) FROM t_following WHERE following_user_id = #{userId}
+  </select>
+  <select id="selectNoteLikeTotal" resultType="long">
+    SELECT COUNT(*) FROM t_note_like WHERE note_id = #{noteId} AND status = 1
+  </select>
+  <select id="selectNoteCollectTotal" resultType="long">
+    SELECT COUNT(*) FROM t_note_collection WHERE note_id = #{noteId} AND status = 1
+  </select>
+  <select id="selectUserLikeTotal" resultType="long">
+    SELECT COUNT(*) FROM t_note_like l JOIN t_note n ON n.id = l.note_id
+    WHERE n.creator_id = #{userId} AND l.status = 1
+  </select>
+  <select id="selectUserCollectTotal" resultType="long">
+    SELECT COUNT(*) FROM t_note_collection c JOIN t_note n ON n.id = c.note_id
+    WHERE n.creator_id = #{userId} AND c.status = 1
+  </select>
+  <select id="selectNoteCreatorId" resultType="long">
+    SELECT creator_id FROM t_note WHERE id = #{noteId}
+  </select>
+
+  <update id="updateFollowingTotal">
+    UPDATE t_user_count SET following_total = #{total} WHERE user_id = #{userId}
+  </update>
+  <update id="updateFansTotal">
+    UPDATE t_user_count SET fans_total = #{total} WHERE user_id = #{userId}
+  </update>
+  <update id="updateNoteLikeTotal">
+    UPDATE t_note_count SET like_total = #{total} WHERE note_id = #{noteId}
+  </update>
+  <update id="updateNoteCollectTotal">
+    UPDATE t_note_count SET collect_total = #{total} WHERE note_id = #{noteId}
+  </update>
+  <update id="updateUserLikeTotal">
+    UPDATE t_user_count SET like_total = #{total} WHERE user_id = #{userId}
+  </update>
+  <update id="updateUserCollectTotal">
+    UPDATE t_user_count SET collect_total = #{total} WHERE user_id = #{userId}
+  </update>
+</mapper>

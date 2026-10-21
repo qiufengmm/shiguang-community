@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quanxiaoha.xiaohashu.comment.biz.domain.mapper.CommentTombstoneMapper">
+  <resultMap id="CommentTombstoneResultMap" type="com.quanxiaoha.xiaohashu.comment.biz.domain.dataobject.CommentTombstoneDO">
+    <id column="comment_id" property="commentId" jdbcType="BIGINT" />
+    <result column="delete_root_id" property="deleteRootId" jdbcType="BIGINT" />
+    <result column="note_id" property="noteId" jdbcType="BIGINT" />
+    <result column="level" property="level" jdbcType="TINYINT" />
+    <result column="parent_id" property="parentId" jdbcType="BIGINT" />
+    <result column="content_uuid" property="contentUuid" jdbcType="VARCHAR" />
+    <result column="is_content_empty" property="contentEmpty" jdbcType="BIT" />
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+    <result column="content_cleanup_status" property="contentCleanupStatus" jdbcType="VARCHAR" />
+    <result column="deleted_time" property="deletedTime" jdbcType="TIMESTAMP" />
+  </resultMap>
+  <sql id="Columns">
+    comment_id, delete_root_id, note_id, level, parent_id, content_uuid, is_content_empty,
+    create_time, content_cleanup_status, deleted_time
+  </sql>
+  <select id="existsByCommentId" resultType="int">
+    SELECT COUNT(1) FROM t_comment_tombstone WHERE comment_id = #{commentId}
+  </select>
+  <select id="selectByCommentIdForUpdate" resultMap="CommentTombstoneResultMap">
+    SELECT <include refid="Columns" /> FROM t_comment_tombstone WHERE comment_id = #{commentId} FOR UPDATE
+  </select>
+  <insert id="insertIfAbsent" parameterType="com.quanxiaoha.xiaohashu.comment.biz.domain.dataobject.CommentTombstoneDO">
+    INSERT INTO t_comment_tombstone
+      (comment_id, delete_root_id, note_id, level, parent_id, content_uuid, is_content_empty,
+       create_time, content_cleanup_status, deleted_time)
+    VALUES
+      (#{commentId}, #{deleteRootId}, #{noteId}, #{level}, #{parentId}, #{contentUuid}, #{contentEmpty},
+       #{createTime}, IF(#{contentEmpty} = b'1' OR #{contentUuid} IS NULL OR #{contentUuid} = '', 'CLEANED', 'PENDING'), NOW())
+    ON DUPLICATE KEY UPDATE comment_id = comment_id
+  </insert>
+  <select id="selectByDeleteRootId" resultMap="CommentTombstoneResultMap">
+    SELECT <include refid="Columns" /> FROM t_comment_tombstone WHERE delete_root_id = #{deleteRootId}
+  </select>
+  <select id="selectPendingContentCleanup" resultMap="CommentTombstoneResultMap">
+    SELECT <include refid="Columns" /> FROM t_comment_tombstone t
+    WHERE t.content_cleanup_status = 'PENDING' AND t.is_content_empty = b'0'
+      AND t.content_uuid IS NOT NULL AND t.content_uuid != ''
+      AND EXISTS (
+        SELECT 1 FROM t_comment_inbox i
+        WHERE i.event_key = CONCAT('comment-delete:', t.delete_root_id)
+          AND i.event_type = 'DELETE'
+          AND i.status = 'APPLIED'
+      )
+    ORDER BY t.comment_id ASC LIMIT #{limit}
+  </select>
+  <update id="markContentCleaned">
+    UPDATE t_comment_tombstone SET content_cleanup_status = 'CLEANED'
+    WHERE comment_id = #{commentId} AND content_cleanup_status = 'PENDING'
+  </update>
+</mapper>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quanxiaoha.xiaohashu.data.align.domain.mapper.CountConsumeLogCleanMapper">
+
+  <!-- 保留期要长于 RocketMQ 的消息保留时长（默认 72 小时），否则过期消息重放时会失去幂等保护 -->
+  <delete id="deleteExpired">
+    DELETE FROM t_count_consume_log
+    WHERE created_time &lt; DATE_SUB(NOW(), INTERVAL #{retentionDays} DAY)
+    LIMIT #{limit}
+  </delete>
+
+</mapper>

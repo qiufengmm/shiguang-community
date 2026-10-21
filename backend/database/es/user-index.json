@@ -1,0 +1,16 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 1
+  },
+  "mappings": {
+    "properties": {
+      "id": {"type": "long"},
+      "nickname": {"type": "text", "analyzer": "ik_max_word", "search_analyzer": "ik_smart"},
+      "avatar": {"type": "keyword"},
+      "xiaohashu_id": {"type": "keyword"},
+      "note_total": {"type": "integer"},
+      "fans_total": {"type": "integer"}
+    }
+  }
+}

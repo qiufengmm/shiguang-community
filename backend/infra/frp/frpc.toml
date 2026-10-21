@@ -1,0 +1,15 @@
+serverAddr = "{{ .Envs.FRP_SERVER_ADDR }}"
+serverPort = 7000
+
+auth.method = "token"
+auth.token = "{{ .Envs.FRP_TOKEN }}"
+
+log.to = "/opt/frpc/frpc.log"
+log.level = "warn"
+
+[[proxies]]
+name = "xiaohashu-gateway"
+type = "tcp"
+localIP = "{{ .Envs.FRP_LOCAL_IP }}"
+localPort = {{ .Envs.FRP_LOCAL_PORT }}
+remotePort = {{ .Envs.FRP_REMOTE_PORT }}

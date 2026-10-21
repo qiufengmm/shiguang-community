@@ -1,0 +1,28 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 1
+  },
+  "mappings": {
+    "properties": {
+      "id": {"type": "long"},
+      "cover": {"type": "keyword"},
+      "title": {"type": "text", "analyzer": "ik_max_word", "search_analyzer": "ik_smart"},
+      "topic": {"type": "text", "analyzer": "ik_max_word", "search_analyzer": "ik_smart"},
+      "creator_nickname": {"type": "keyword"},
+      "creator_avatar": {"type": "keyword"},
+      "type": {"type": "integer"},
+      "create_time": {
+        "type": "date",
+        "format": "yyyy-MM-dd HH:mm:ss"
+      },
+      "update_time": {
+        "type": "date",
+        "format": "yyyy-MM-dd HH:mm:ss"
+      },
+      "like_total": {"type": "integer"},
+      "collect_total": {"type": "integer"},
+      "comment_total": {"type": "integer"}
+    }
+  }
+}

@@ -1,0 +1,14 @@
+bindAddr = "0.0.0.0"
+bindPort = 7000
+allowPorts = [{ single = 8000 }]
+
+webServer.addr = "0.0.0.0"
+webServer.port = 7500
+webServer.user = "{{ .Envs.FRP_WEB_USER }}"
+webServer.password = "{{ .Envs.FRP_WEB_PASSWORD }}"
+
+auth.method = "token"
+auth.token = "{{ .Envs.FRP_TOKEN }}"
+
+log.to = "/opt/frps/frps.log"
+log.level = "warn"

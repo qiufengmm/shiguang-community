@@ -1,0 +1,61 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${MYSQL_URL:jdbc:mysql://127.0.0.1:3306/xiaohashu?useUnicode=true&characterEncoding=utf-8&autoReconnect=true&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:}
+    type: com.alibaba.druid.pool.DruidDataSource
+    druid:
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      max-wait: 60000
+      test-while-idle: true
+      time-between-eviction-runs-millis: 60000
+      min-evictable-idle-time-millis: 300000
+      max-evictable-idle-time-millis: 900000
+      validation-query: SELECT 1 FROM DUAL
+      test-on-borrow: false
+      test-on-return: false
+      pool-prepared-statements: false
+      web-stat-filter:
+        enabled: true
+      stat-view-servlet:
+        enabled: true
+        url-pattern: /druid/*
+      filter:
+        stat:
+          enabled: true
+          log-slow-sql: true
+          slow-sql-millis: 2000
+          merge-sql: true
+        wall:
+          config:
+            multi-statement-allow: true
+
+  data:
+    redis:
+      database: 0 # Redis 数据库索引（默认为 0）
+      host: 127.0.0.1 # Redis 服务器地址
+      port: 6379 # Redis 服务器连接端口
+      password: qwe123!@# # Redis 服务器连接密码
+      timeout: 5s # 读超时时间
+      connect-timeout: 5s # 链接超时时间
+      lettuce:
+        pool:
+          max-active: 200 # 连接池最大连接数
+          max-wait: -1ms # 连接池最大阻塞等待时间（使用负值表示没有限制）
+          min-idle: 0 # 连接池中的最小空闲连接
+          max-idle: 10 # 连接池中的最大空闲连接
+
+rocketmq:
+  name-server: 127.0.0.1:9876
+  producer:
+    group: xiaohashu_group
+    send-message-timeout: 3000
+    retry-times-when-send-failed: 3
+    retry-times-when-send-async-failed: 3
+    max-message-size: 4096
+  consumer:
+    group: xiaohashu_group
+    pull-batch-size: 5

@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quanxiaoha.xiaohashu.data.align.domain.mapper.CountAuditMapper">
+
+    <resultMap id="countAuditMarkerMap" type="com.quanxiaoha.xiaohashu.data.align.domain.mapper.CountAuditMarker">
+        <id column="row_id" property="rowId"/>
+        <result column="entity_id" property="entityId"/>
+    </resultMap>
+
+    <select id="selectMarkerTables" resultType="string">
+        select table_name
+        from information_schema.tables
+        where table_schema = database()
+          and left(table_name, length(#{tablePrefix})) = #{tablePrefix}
+        order by table_name
+    </select>
+
+    <select id="selectBatch" resultMap="countAuditMarkerMap">
+        select id as row_id, ${entityColumn} as entity_id
+        from `${tableName}`
+        where id &gt; #{lastRowId}
+        order by id
+        limit #{batchSize}
+    </select>
+
+    <select id="selectSourceCount" resultType="long">
+        <choose>
+            <when test="metric == 'FOLLOWING'">
+                select count(*) from t_following where user_id = #{entityId}
+            </when>
+            <when test="metric == 'FANS'">
+                select count(*) from t_following where following_user_id = #{entityId}
+            </when>
+            <when test="metric == 'NOTE_COLLECT'">
+                select count(*) from t_note_collection where note_id = #{entityId} and status = 1
+            </when>
+            <when test="metric == 'USER_COLLECT'">
+                select count(*) from t_note_collection c
+                join t_note n on n.id = c.note_id
+                where n.creator_id = #{entityId} and c.status = 1
+            </when>
+            <when test="metric == 'USER_LIKE'">
+                select count(*) from t_note_like l
+                join t_note n on n.id = l.note_id
+                where n.creator_id = #{entityId} and l.status = 1
+            </when>
+            <when test="metric == 'NOTE_LIKE'">
+                select count(*) from t_note_like where note_id = #{entityId} and status = 1
+            </when>
+            <when test="metric == 'NOTE_PUBLISH'">
+                select count(*) from t_note where creator_id = #{entityId} and status &lt;&gt; 2
+            </when>
+            <otherwise>
+                select 0
+            </otherwise>
+        </choose>
+    </select>
+
+    <select id="selectStoredCount" resultType="long">
+        <choose>
+            <when test="metric == 'FOLLOWING'">
+                select coalesce((select following_total from t_user_count where user_id = #{entityId}), 0)
+            </when>
+            <when test="metric == 'FANS'">
+                select coalesce((select fans_total from t_user_count where user_id = #{entityId}), 0)
+            </when>
+            <when test="metric == 'NOTE_COLLECT'">
+                select coalesce((select collect_total from t_note_count where note_id = #{entityId}), 0)
+            </when>
+            <when test="metric == 'USER_COLLECT'">
+                select coalesce((select collect_total from t_user_count where user_id = #{entityId}), 0)
+            </when>
+            <when test="metric == 'USER_LIKE'">
+                select coalesce((select like_total from t_user_count where user_id = #{entityId}), 0)
+            </when>
+            <when test="metric == 'NOTE_LIKE'">
+                select coalesce((select like_total from t_note_count where note_id = #{entityId}), 0)
+            </when>
+            <when test="metric == 'NOTE_PUBLISH'">
+                select coalesce((select note_total from t_user_count where user_id = #{entityId}), 0)
+            </when>
+            <otherwise>
+                select 0
+            </otherwise>
+        </choose>
+    </select>
+
+    <insert id="ensureCounterRow">
+        <choose>
+            <when test="metric == 'NOTE_LIKE' or metric == 'NOTE_COLLECT'">
+                insert ignore into t_note_count (note_id) values (#{entityId})
+            </when>
+            <otherwise>
+                insert ignore into t_user_count (user_id) values (#{entityId})
+            </otherwise>
+        </choose>
+    </insert>
+
+    <select id="lockCounterRow" resultType="long">
+        <choose>
+            <when test="metric == 'NOTE_LIKE' or metric == 'NOTE_COLLECT'">
+                select note_id from t_note_count where note_id = #{entityId} for update
+            </when>
+            <otherwise>
+                select user_id from t_user_count where user_id = #{entityId} for update
+            </otherwise>
+        </choose>
+    </select>
+
+    <update id="updateStoredCount">
+        <choose>
+            <when test="metric == 'FOLLOWING'">
+                update t_user_count set following_total = #{total} where user_id = #{entityId}
+            </when>
+            <when test="metric == 'FANS'">
+                update t_user_count set fans_total = #{total} where user_id = #{entityId}
+            </when>
+            <when test="metric == 'NOTE_COLLECT'">
+                update t_note_count set collect_total = #{total} where note_id = #{entityId}
+            </when>
+            <when test="metric == 'USER_COLLECT'">
+                update t_user_count set collect_total = #{total} where user_id = #{entityId}
+            </when>
+            <when test="metric == 'USER_LIKE'">
+                update t_user_count set like_total = #{total} where user_id = #{entityId}
+            </when>
+            <when test="metric == 'NOTE_LIKE'">
+                update t_note_count set like_total = #{total} where note_id = #{entityId}
+            </when>
+            <when test="metric == 'NOTE_PUBLISH'">
+                update t_user_count set note_total = #{total} where user_id = #{entityId}
+            </when>
+            <otherwise>
+                update t_user_count set user_id = user_id where user_id = #{entityId}
+            </otherwise>
+        </choose>
+    </update>
+
+    <select id="selectMarkerRowCount" resultType="long">
+        select count(*) from `${tableName}`
+    </select>
+</mapper>

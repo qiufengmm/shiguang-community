@@ -1,0 +1,2 @@
+ALTER TABLE t_comment
+    ADD COLUMN heat DECIMAL(10, 2) DEFAULT 0 COMMENT '评论热度';

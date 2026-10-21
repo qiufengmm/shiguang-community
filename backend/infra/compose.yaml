@@ -1,0 +1,366 @@
+name: xiaohashu
+
+services:
+  mysql:
+    image: mysql:8.0.27
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MYSQL_HOST_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in the shell}
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  redis:
+    image: aviggiano/redis-roaring@sha256:a2679eb6c0fba5455e99e0aee8000700be33ee82ec7bd9ffaaeec29e29eb15e3
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
+    volumes:
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/redis/data
+        target: /data
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/redis/modules
+        target: /etc/redis/modules
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/redis/conf/redis-roaring.conf
+        target: /usr/local/etc/redis/redis.conf
+        read_only: true
+        bind: {create_host_path: false}
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+
+  nacos:
+    image: nacos/nacos-server:v2.2.3
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${NACOS_HOST_PORT:-8848}:8848"
+      - "127.0.0.1:${NACOS_GRPC_HOST_PORT:-9848}:9848"
+      - "127.0.0.1:${NACOS_RAFT_HOST_PORT:-9849}:9849"
+    environment:
+      MODE: standalone
+      PREFER_HOST_MODE: ip
+      TZ: Asia/Shanghai
+    volumes:
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/nacos/conf
+        target: /home/nacos/conf
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/nacos/data
+        target: /home/nacos/data
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/nacos/logs
+        target: /home/nacos/logs
+        bind: {create_host_path: false}
+
+  minio:
+    image: minio/minio:RELEASE.2023-09-30T07-02-29Z
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MINIO_HOST_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_HOST_PORT:-9090}:9090"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in the shell}
+      TZ: Asia/Shanghai
+    volumes:
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/minio/data
+        target: /data
+        bind: {create_host_path: false}
+    command: ["server", "/data", "--console-address", ":9090"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/ready >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  cassandra:
+    image: cassandra:5.0.4
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CASSANDRA_HOST_PORT:-9042}:9042"
+    volumes:
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/cassandra5/config
+        target: /etc/cassandra
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/cassandra5/data
+        target: /var/lib/cassandra
+        bind: {create_host_path: false}
+    command: ["cassandra", "-f"]
+
+  zookeeper:
+    image: zookeeper:3.5.6
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${ZOOKEEPER_HOST_PORT:-2181}:2181"
+    volumes:
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/zookeeper/data
+        target: /data
+        bind: {create_host_path: false}
+      - zookeeper-datalog:/datalog
+      - zookeeper-logs:/logs
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/zookeeper/conf
+        target: /conf
+        bind: {create_host_path: false}
+
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.3.1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${ROCKETMQ_NAMESRV_HOST_PORT:-9876}:9876"
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/rocketmq/namesrv/logs
+        target: /home/rocketmq/logs
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/rocketmq/namesrv/bin/runserver.sh
+        target: /home/rocketmq/rocketmq-5.3.1/bin/runserver.sh
+        read_only: true
+        bind: {create_host_path: false}
+    command: ["sh", "mqnamesrv"]
+
+  rocketmq-broker:
+    image: apache/rocketmq:5.3.1
+    restart: unless-stopped
+    depends_on:
+      - rocketmq-namesrv
+    ports:
+      - "127.0.0.1:${ROCKETMQ_BROKER_VIP_HOST_PORT:-10909}:10909"
+      - "127.0.0.1:${ROCKETMQ_BROKER_HOST_PORT:-10911}:10911"
+      - "127.0.0.1:${ROCKETMQ_BROKER_LISTEN_HOST_PORT:-10912}:10912"
+    environment:
+      NAMESRV_ADDR: rocketmq-namesrv:9876
+      TZ: Asia/Shanghai
+    volumes:
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/rocketmq/broker/logs
+        target: /home/rocketmq/logs/rocketmqlogs
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/rocketmq/broker/store
+        target: /home/rocketmq/store
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/rocketmq/broker/bin/runbroker.sh
+        target: /home/rocketmq/rocketmq-5.3.1/bin/runbroker.sh
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ./rocketmq/broker-compose.conf
+        target: /home/rocketmq/rocketmq-5.3.1/conf/broker.conf
+        read_only: true
+        bind: {create_host_path: false}
+    command:
+      ["sh", "mqbroker", "--enable-proxy", "-c", "/home/rocketmq/rocketmq-5.3.1/conf/broker.conf"]
+
+  rocketmq-dashboard:
+    image: apacherocketmq/rocketmq-dashboard:2.0.0
+    restart: unless-stopped
+    depends_on:
+      - rocketmq-namesrv
+    ports:
+      - "127.0.0.1:${ROCKETMQ_DASHBOARD_HOST_PORT:-8070}:8080"
+    environment:
+      JAVA_OPTS: "-Xmx200M -Xms200M -Xmn100M -Drocketmq.namesrv.addr=rocketmq-namesrv:9876 -Dcom.rocketmq.sendMessageWithVIPChannel=false"
+      TZ: Asia/Shanghai
+
+  elasticsearch:
+    image: elasticsearch:7.3.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${ELASTICSEARCH_HOST_PORT:-9200}:9200"
+      - "127.0.0.1:${ELASTICSEARCH_TRANSPORT_HOST_PORT:-9300}:9300"
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: -Xms1024m -Xmx1024m
+      xpack.security.enabled: "false"
+      TZ: Asia/Shanghai
+    volumes:
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/elasticsearch/config
+        target: /usr/share/elasticsearch/config
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/elasticsearch/data
+        target: /usr/share/elasticsearch/data
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/elasticsearch/logs
+        target: /usr/share/elasticsearch/logs
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/elasticsearch/plugins
+        target: /usr/share/elasticsearch/plugins
+        bind: {create_host_path: false}
+
+  kibana:
+    image: kibana:7.3.0
+    restart: unless-stopped
+    depends_on:
+      - elasticsearch
+    ports:
+      - "127.0.0.1:${KIBANA_HOST_PORT:-5601}:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      TZ: Asia/Shanghai
+    volumes:
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/kibana/config
+        target: /usr/share/kibana/config
+        bind: {create_host_path: false}
+
+  es-head:
+    image: mobz/elasticsearch-head:5-alpine
+    restart: unless-stopped
+    depends_on:
+      - elasticsearch
+    ports:
+      - "127.0.0.1:${ES_HEAD_HOST_PORT:-9100}:9100"
+
+  canal:
+    image: canal/canal-server:v1.1.7
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${CANAL_HOST_PORT:-11111}:11111"
+    environment:
+      canal.instance.master.address: mysql:3306
+      canal.instance.dbUsername: ${CANAL_DB_USERNAME:?Set CANAL_DB_USERNAME in the shell}
+      canal.instance.dbPassword: ${CANAL_DB_PASSWORD:?Set CANAL_DB_PASSWORD in the shell}
+      canal.instance.connectionCharset: UTF-8
+      canal.instance.tsdb.enable: "true"
+      canal.instance.gtidon: "false"
+      canal.instance.filter.regex: 'xiaohashu\..*'
+      TZ: Asia/Shanghai
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 11111"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+
+  xxl-job-admin:
+    image: xuxueli/xxl-job-admin:2.4.1
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${XXL_JOB_ADMIN_HOST_PORT:-7777}:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/xxl_job?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${XXL_JOB_MYSQL_PASSWORD:?Set XXL_JOB_MYSQL_PASSWORD in the shell}
+      TZ: Asia/Shanghai
+    volumes:
+      - xxl-job-admin-logs:/data/applogs
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
+  sentinel-dashboard:
+    image: xiaohashu/sentinel-dashboard:1.8.8
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${SENTINEL_HOST_PORT:-8060}:8060"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8060/ >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+
+  frps:
+    image: fatedier/frps:v0.61.2
+    profiles:
+      - frp-server
+      - frp-local-test
+    restart: unless-stopped
+    ports:
+      - "${FRPS_HOST_BIND_ADDR:-127.0.0.1}:${FRPS_HOST_BIND_PORT:-7000}:7000"
+      - "${FRPS_HOST_BIND_ADDR:-127.0.0.1}:${FRPS_HOST_WEB_PORT:-7500}:7500"
+      - "${FRPS_HOST_BIND_ADDR:-127.0.0.1}:${FRPS_HOST_REMOTE_PORT:-8000}:8000"
+    environment:
+      FRP_TOKEN: ${FRP_TOKEN:-}
+      FRP_WEB_USER: ${FRP_WEB_USER:-admin}
+      FRP_WEB_PASSWORD: ${FRP_WEB_PASSWORD:-}
+      TZ: Asia/Shanghai
+    volumes:
+      - type: bind
+        source: ./frp/frps.toml
+        target: /etc/frp/frps.toml
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/frp/frps
+        target: /opt/frps
+        bind: {create_host_path: false}
+    command: ["-c", "/etc/frp/frps.toml"]
+
+  frpc:
+    image: fatedier/frpc:v0.61.2
+    profiles:
+      - frp-client
+      - frp-local-test
+    restart: unless-stopped
+    environment:
+      FRP_SERVER_ADDR: ${FRP_SERVER_ADDR:-frps}
+      FRP_TOKEN: ${FRP_TOKEN:-}
+      FRP_LOCAL_IP: ${FRP_LOCAL_IP:-host.docker.internal}
+      FRP_LOCAL_PORT: ${FRP_LOCAL_PORT:-8000}
+      FRP_REMOTE_PORT: ${FRP_REMOTE_PORT:-8000}
+      TZ: Asia/Shanghai
+    volumes:
+      - type: bind
+        source: ./frp/frpc.toml
+        target: /etc/frp/frpc.toml
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${XIAOHASHU_DATA_ROOT:-F:/docker}/frp/frpc
+        target: /opt/frpc
+        bind: {create_host_path: false}
+    command: ["-c", "/etc/frp/frpc.toml"]
+
+volumes:
+  mysql-data:
+    external: true
+    name: ${MYSQL_DATA_VOLUME_NAME:-6df9fb0d182aefb79309ffe731a3108c82891aa754af05821e8b6ab173e7e6f6}
+  zookeeper-datalog:
+    external: true
+    name: ${ZOOKEEPER_DATALOG_VOLUME_NAME:-3e05f541c797124aacb4966fe55ee007fcd568d1a8755d01a541f6e7d5fc22d2}
+  zookeeper-logs:
+    external: true
+    name: ${ZOOKEEPER_LOGS_VOLUME_NAME:-7069af39c92135e8b49f94422274df662142b4aac22ef1454e98595160f157a7}
+  xxl-job-admin-logs:
+    external: true
+    name: ${XXL_JOB_LOGS_VOLUME_NAME:-xxl-job_xxl-job-admin-logs}

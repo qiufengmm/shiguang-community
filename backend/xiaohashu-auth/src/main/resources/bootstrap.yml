@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: xiaohashu-auth # 应用名称
+  profiles:
+    active: dev # 默认激活 dev 本地开发环境
+  cloud:
+    nacos:
+      config: # Nacos 配置中心
+        server-addr: http://127.0.0.1:8848 # 指定 Nacos 配置中心的服务器地址
+        prefix: ${spring.application.name} # 配置 Data Id 前缀，这里使用应用名称作为前缀
+        group: DEFAULT_GROUP # 所属组
+        namespace: xiaohashu # 命名空间（拾光社区项目专用，标识沿用 xiaohashu）；实际监听的 Data Id 为 prefix-profile.file-extension
+        file-extension: yaml # 配置文件格式，注意是 yaml 不是 yml
+        refresh-enabled: true # 是否开启动态刷新
+      discovery: # 服务注册发现
+        enabled: true # 启用服务发现
+        group: DEFAULT_GROUP # 所属组
+        namespace: xiaohashu # 命名空间
+        server-addr: 127.0.0.1:8848 # 指定 Nacos 注册中心的服务器地址

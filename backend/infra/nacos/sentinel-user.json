@@ -1,0 +1,10 @@
+[
+  {
+    "resource": "POST:http://xiaohashu-count/count/user/data",
+    "grade": 2,
+    "count": 5,
+    "timeWindow": 3,
+    "minRequestAmount": 5,
+    "statIntervalMs": 1000
+  }
+]

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quanxiaoha.xiaohashu.note.biz.domain.mapper.NoteOperateOutboxMapper">
+  <resultMap id="NoteOperateOutboxResultMap" type="com.quanxiaoha.xiaohashu.note.biz.domain.dataobject.NoteOperateOutboxDO">
+    <id column="id" property="id" jdbcType="BIGINT" />
+    <result column="event_id" property="eventId" jdbcType="VARCHAR" />
+    <result column="creator_id" property="creatorId" jdbcType="BIGINT" />
+    <result column="note_id" property="noteId" jdbcType="BIGINT" />
+    <result column="operation_type" property="operationType" jdbcType="TINYINT" />
+    <result column="topic" property="topic" jdbcType="VARCHAR" />
+    <result column="payload" property="payload" jdbcType="LONGVARCHAR" />
+    <result column="status" property="status" jdbcType="VARCHAR" />
+    <result column="attempt_count" property="attemptCount" jdbcType="INTEGER" />
+    <result column="next_attempt_at" property="nextAttemptAt" jdbcType="TIMESTAMP" />
+    <result column="last_error" property="lastError" jdbcType="VARCHAR" />
+    <result column="lease_owner" property="leaseOwner" jdbcType="VARCHAR" />
+    <result column="lease_until" property="leaseUntil" jdbcType="TIMESTAMP" />
+    <result column="lease_version" property="leaseVersion" jdbcType="BIGINT" />
+    <result column="created_time" property="createdTime" jdbcType="TIMESTAMP" />
+    <result column="updated_time" property="updatedTime" jdbcType="TIMESTAMP" />
+    <result column="sent_time" property="sentTime" jdbcType="TIMESTAMP" />
+  </resultMap>
+  <sql id="Columns">
+    id, event_id, creator_id, note_id, operation_type, topic, payload, status,
+    attempt_count, next_attempt_at, last_error, lease_owner, lease_until,
+    lease_version, created_time, updated_time, sent_time
+  </sql>
+  <insert id="insertIfAbsent" parameterType="com.quanxiaoha.xiaohashu.note.biz.domain.dataobject.NoteOperateOutboxDO">
+    INSERT INTO t_note_operate_outbox
+      (event_id, creator_id, note_id, operation_type, topic, payload, status,
+       attempt_count, next_attempt_at, lease_version, created_time, updated_time)
+    VALUES
+      (#{eventId}, #{creatorId}, #{noteId}, #{operationType}, #{topic}, #{payload},
+       'PENDING', 0, #{nextAttemptAt}, 0, NOW(), NOW())
+    ON DUPLICATE KEY UPDATE id = id
+  </insert>
+  <select id="selectClaimable" resultMap="NoteOperateOutboxResultMap">
+    SELECT <include refid="Columns" />
+    FROM t_note_operate_outbox
+    WHERE (status = 'PENDING' AND next_attempt_at &lt;= #{now})
+       OR (status = 'SENDING' AND lease_until &lt;= #{now})
+    ORDER BY id ASC
+    LIMIT #{limit}
+    FOR UPDATE SKIP LOCKED
+  </select>
+  <update id="acquireLease">
+    UPDATE t_note_operate_outbox
+    SET status = 'SENDING', attempt_count = attempt_count + 1,
+        lease_owner = #{owner}, lease_until = #{leaseUntil}, lease_version = lease_version + 1,
+        updated_time = #{now}
+    WHERE id = #{id}
+      AND ((status = 'PENDING' AND next_attempt_at &lt;= #{now})
+        OR (status = 'SENDING' AND lease_until &lt;= #{now}))
+  </update>
+  <update id="markSent">
+    UPDATE t_note_operate_outbox
+    SET status = 'SENT', sent_time = #{sentTime}, lease_owner = NULL, lease_until = NULL,
+        last_error = NULL, updated_time = #{sentTime}
+    WHERE id = #{id} AND status = 'SENDING' AND lease_owner = #{owner} AND lease_version = #{leaseVersion}
+  </update>
+  <update id="scheduleRetry">
+    UPDATE t_note_operate_outbox
+    SET status = 'PENDING', next_attempt_at = #{nextAttemptAt}, last_error = #{lastError},
+        lease_owner = NULL, lease_until = NULL, updated_time = #{updatedTime}
+    WHERE id = #{id} AND status = 'SENDING' AND lease_owner = #{owner} AND lease_version = #{leaseVersion}
+  </update>
+</mapper>
